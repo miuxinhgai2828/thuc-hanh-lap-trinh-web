@@ -1,0 +1,487 @@
+[1mdiff --git a/app/Models/QuanLySuKien.php b/app/Models/QuanLySuKien.php[m
+[1mnew file mode 100644[m
+[1mindex 0000000..b3d27a3[m
+[1m--- /dev/null[m
+[1m+++ b/app/Models/QuanLySuKien.php[m
+[36m@@ -0,0 +1,323 @@[m
+[32m+[m
+[32m+[m[32m<?php[m
+[32m+[m
+[32m+[m[32mrequire_once __DIR__ . '/../Core/ket_noi_csdl.php';[m
+[32m+[m
+[32m+[m[32mclass QuanLySuKien[m
+[32m+[m[32m{[m
+[32m+[m[32m    private PDO $pdo;[m
+[32m+[m
+[32m+[m[32m    public function __construct()[m
+[32m+[m[32m    {[m
+[32m+[m[32m        global $pdo;[m
+[32m+[m[32m        $this->pdo = $pdo;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Lay danh sach su kien va so luot dang ky[m
+[32m+[m[41m    [m
+[32m+[m[32mpublic function layDanhSach(array $boLoc = []): array[m
+[32m+[m[32m{[m
+[32m+[m[32m    $tuKhoa = trim($boLoc['tu_khoa'] ?? '');[m
+[32m+[m[32m    $cauLacBoId = (int) ($boLoc['cau_lac_bo_id'] ?? 0);[m
+[32m+[m[32m    $trangThai = $boLoc['trang_thai'] ?? '';[m
+[32m+[m[32m    $tuNgay = $boLoc['tu_ngay'] ?? '';[m
+[32m+[m[32m    $denNgay = $boLoc['den_ngay'] ?? '';[m
+[32m+[m
+[32m+[m[32m    $sapXep = $boLoc['sap_xep'] ?? 'thoi_gian';[m
+[32m+[m[32m    $huong = strtoupper($boLoc['huong'] ?? 'ASC');[m
+[32m+[m
+[32m+[m[32m    $cotSapXep = [[m
+[32m+[m[32m        'thoi_gian' => 'sk.thoi_gian_bat_dau',[m
+[32m+[m[32m        'dang_ky' => 'so_luot_dang_ky',[m
+[32m+[m[32m    ];[m
+[32m+[m
+[32m+[m[32m    if (!isset($cotSapXep[$sapXep])) {[m
+[32m+[m[32m        $sapXep = 'thoi_gian';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (!in_array($huong, ['ASC', 'DESC'], true)) {[m
+[32m+[m[32m        $huong = 'ASC';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    $where = ['1 = 1'];[m
+[32m+[m[32m    $params = [];[m
+[32m+[m
+[32m+[m[32m    if ($tuKhoa !== '') {[m
+[32m+[m[32m        $where[] = 'sk.ten_su_kien LIKE :tu_khoa';[m
+[32m+[m[32m        $params['tu_khoa'] = '%' . $tuKhoa . '%';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ($cauLacBoId > 0) {[m
+[32m+[m[32m        $where[] = 'sk.cau_lac_bo_id = :clb_id';[m
+[32m+[m[32m        $params['clb_id'] = $cauLacBoId;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (in_array($trangThai, [[m
+[32m+[m[32m        'nhap', 'cong_khai', 'da_huy', 'ket_thuc'[m
+[32m+[m[32m    ], true)) {[m
+[32m+[m[32m        $where[] = 'sk.trang_thai = :trang_thai';[m
+[32m+[m[32m        $params['trang_thai'] = $trangThai;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ($tuNgay !== '') {[m
+[32m+[m[32m        $where[] = 'sk.thoi_gian_bat_dau >= :tu_ngay';[m
+[32m+[m[32m        $params['tu_ngay'] = $tuNgay . ' 00:00:00';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ($denNgay !== '') {[m
+[32m+[m[32m        $where[] = 'sk.thoi_gian_bat_dau <= :den_ngay';[m
+[32m+[m[32m        $params['den_ngay'] = $denNgay . ' 23:59:59';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    $dieuKien = implode(' AND ', $where);[m
+[32m+[m
+[32m+[m[32m    $sql = "[m
+[32m+[m[32m        SELECT[m
+[32m+[m[32m            sk.id,[m
+[32m+[m[32m            sk.cau_lac_bo_id,[m
+[32m+[m[32m            sk.ten_su_kien,[m
+[32m+[m[32m            sk.mo_ta,[m
+[32m+[m[32m            sk.dia_diem,[m
+[32m+[m[32m            sk.thoi_gian_bat_dau,[m
+[32m+[m[32m            sk.thoi_gian_ket_thuc,[m
+[32m+[m[32m            sk.so_luong_toi_da,[m
+[32m+[m[32m            sk.trang_thai,[m
+[32m+[m[32m            clb.ten_cau_lac_bo,[m
+[32m+[m[32m            COUNT(dk.id) AS so_luot_dang_ky[m
+[32m+[m[32m        FROM su_kien sk[m
+[32m+[m[32m        INNER JOIN cau_lac_bo clb[m
+[32m+[m[32m            ON clb.id = sk.cau_lac_bo_id[m
+[32m+[m[32m        LEFT JOIN dang_ky dk[m
+[32m+[m[32m            ON dk.su_kien_id = sk.id[m
+[32m+[m[32m            AND dk.trang_thai = 'da_dang_ky'[m
+[32m+[m[32m        WHERE $dieuKien[m
+[32m+[m[32m        GROUP BY[m
+[32m+[m[32m            sk.id, sk.cau_lac_bo_id, sk.ten_su_kien,[m
+[32m+[m[32m            sk.mo_ta, sk.dia_diem, sk.thoi_gian_bat_dau,[m
+[32m+[m[32m            sk.thoi_gian_ket_thuc, sk.so_luong_toi_da,[m
+[32m+[m[32m            sk.trang_thai, clb.ten_cau_lac_bo[m
+[32m+[m[32m        ORDER BY {$cotSapXep[$sapXep]} $huong, sk.id DESC[m
+[32m+[m[32m        LIMIT :gioi_han OFFSET :vi_tri[m
+[32m+[m[32m    ";[m
+[32m+[m
+[32m+[m[32m    $soDongMoiTrang = max([m
+[32m+[m[32m        1,[m
+[32m+[m[32m        min(100, (int) ($boLoc['so_dong'] ?? 10))[m
+[32m+[m[32m    );[m
+[32m+[m[32m    $trang = max(1, (int) ($boLoc['trang'] ?? 1));[m
+[32m+[m[32m    $offset = ($trang - 1) * $soDongMoiTrang;[m
+[32m+[m
+[32m+[m[32m    $stmt = $this->pdo->prepare($sql);[m
+[32m+[m
+[32m+[m[32m    foreach ($params as $key => $value) {[m
+[32m+[m[32m        $stmt->bindValue(':' . $key, $value);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    $stmt->bindValue(':gioi_han', $soDongMoiTrang, PDO::PARAM_INT);[m
+[32m+[m[32m    $stmt->bindValue(':vi_tri', $offset, PDO::PARAM_INT);[m
+[32m+[m[32m    $stmt->execute();[m
+[32m+[m
+[32m+[m[32m    return $stmt->fetchAll(PDO::FETCH_ASSOC);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mpublic function demDanhSach(array $boLoc = []): int[m
+[32m+[m[32m{[m
+[32m+[m[32m    $where = ['1 = 1'];[m
+[32m+[m[32m    $params = [];[m
+[32m+[m
+[32m+[m[32m    $tuKhoa = trim($boLoc['tu_khoa'] ?? '');[m
+[32m+[m[32m    $cauLacBoId = (int) ($boLoc['cau_lac_bo_id'] ?? 0);[m
+[32m+[m[32m    $trangThai = $boLoc['trang_thai'] ?? '';[m
+[32m+[m[32m    $tuNgay = $boLoc['tu_ngay'] ?? '';[m
+[32m+[m[32m    $denNgay = $boLoc['den_ngay'] ?? '';[m
+[32m+[m
+[32m+[m[32m    if ($tuKhoa !== '') {[m
+[32m+[m[32m        $where[] = 'ten_su_kien LIKE :tu_khoa';[m
+[32m+[m[32m        $params['tu_khoa'] = '%' . $tuKhoa . '%';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ($cauLacBoId > 0) {[m
+[32m+[m[32m        $where[] = 'cau_lac_bo_id = :clb_id';[m
+[32m+[m[32m        $params['clb_id'] = $cauLacBoId;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (in_array($trangThai, [[m
+[32m+[m[32m        'nhap', 'cong_khai', 'da_huy', 'ket_thuc'[m
+[32m+[m[32m    ], true)) {[m
+[32m+[m[32m        $where[] = 'trang_thai = :trang_thai';[m
+[32m+[m[32m        $params['trang_thai'] = $trangThai;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ($tuNgay !== '') {[m
+[32m+[m[32m        $where[] = 'thoi_gian_bat_dau >= :tu_ngay';[m
+[32m+[m[32m        $params['tu_ngay'] = $tuNgay . ' 00:00:00';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ($denNgay !== '') {[m
+[32m+[m[32m        $where[] = 'thoi_gian_bat_dau <= :den_ngay';[m
+[32m+[m[32m        $params['den_ngay'] = $denNgay . ' 23:59:59';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    $sql = 'SELECT COUNT(*) FROM su_kien WHERE '[m
+[32m+[m[32m        . implode(' AND ', $where);[m
+[32m+[m
+[32m+[m[32m    $stmt = $this->pdo->prepare($sql);[m
+[32m+[m[32m    $stmt->execute($params);[m
+[32m+[m
+[32m+[m[32m    return (int) $stmt->fetchColumn();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mpublic function layChiTiet(int $id): array|false[m
+[32m+[m[32m{[m
+[32m+[m[32m    $sql = "[m
+[32m+[m[32m        SELECT[m
+[32m+[m[32m            sk.*,[m
+[32m+[m[32m            clb.ten_cau_lac_bo,[m
+[32m+[m[32m            COUNT(dk.id) AS so_luot_dang_ky[m
+[32m+[m[32m        FROM su_kien sk[m
+[32m+[m[32m        INNER JOIN cau_lac_bo clb[m
+[32m+[m[32m            ON clb.id = sk.cau_lac_bo_id[m
+[32m+[m[32m        LEFT JOIN dang_ky dk[m
+[32m+[m[32m            ON dk.su_kien_id = sk.id[m
+[32m+[m[32m            AND dk.trang_thai = 'da_dang_ky'[m
+[32m+[m[32m        WHERE sk.id = :id[m
+[32m+[m[32m        GROUP BY[m
+[32m+[m[32m            sk.id, clb.ten_cau_lac_bo[m
+[32m+[m[32m    ";[m
+[32m+[m
+[32m+[m[32m    $stmt = $this->pdo->prepare($sql);[m
+[32m+[m[32m    $stmt->execute(['id' => $id]);[m
+[32m+[m
+[32m+[m[32m    return $stmt->fetch(PDO::FETCH_ASSOC);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m    // Tim su kien theo ID[m
+[32m+[m[32m    public function timTheoId(int $id): array|false[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $stmt = $this->pdo->prepare([m
+[32m+[m[32m            "SELECT * FROM su_kien WHERE id = :id"[m
+[32m+[m[32m        );[m
+[32m+[m
+[32m+[m[32m        $stmt->execute(['id' => $id]);[m
+[32m+[m
+[32m+[m[32m        return $stmt->fetch();[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Them su kien[m
+[32m+[m[32m    public function them(array $data): bool[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $sql = "[m
+[32m+[m[32m            INSERT INTO su_kien ([m
+[32m+[m[32m                cau_lac_bo_id,[m
+[32m+[m[32m                ten_su_kien,[m
+[32m+[m[32m                mo_ta,[m
+[32m+[m[32m                dia_diem,[m
+[32m+[m[32m                thoi_gian_bat_dau,[m
+[32m+[m[32m                thoi_gian_ket_thuc,[m
+[32m+[m[32m                so_luong_toi_da,[m
+[32m+[m[32m                trang_thai,[m
+[32m+[m[32m                nguoi_tao_id[m
+[32m+[m[32m            ) VALUES ([m
+[32m+[m[32m                :cau_lac_bo_id,[m
+[32m+[m[32m                :ten_su_kien,[m
+[32m+[m[32m                :mo_ta,[m
+[32m+[m[32m                :dia_diem,[m
+[32m+[m[32m                :bat_dau,[m
+[32m+[m[32m                :ket_thuc,[m
+[32m+[m[32m                :so_luong,[m
+[32m+[m[32m                :trang_thai,[m
+[32m+[m[32m                :nguoi_tao_id[m
+[32m+[m[32m            )[m
+[32m+[m[32m        ";[m
+[32m+[m
+[32m+[m[32m        $stmt = $this->pdo->prepare($sql);[m
+[32m+[m
+[32m+[m[32m        return $stmt->execute([[m
+[32m+[m[32m            'cau_lac_bo_id' => $data['cau_lac_bo_id'],[m
+[32m+[m[32m            'ten_su_kien' => $data['ten_su_kien'],[m
+[32m+[m[32m            'mo_ta' => $data['mo_ta'] ?: null,[m
+[32m+[m[32m            'dia_diem' => $data['dia_diem'] ?: null,[m
+[32m+[m[32m            'bat_dau' => $data['thoi_gian_bat_dau'],[m
+[32m+[m[32m            'ket_thuc' => $data['thoi_gian_ket_thuc'] ?: null,[m
+[32m+[m[32m            'so_luong' => $data['so_luong_toi_da'],[m
+[32m+[m[32m            'trang_thai' => $data['trang_thai'],[m
+[32m+[m[32m            'nguoi_tao_id' => $data['nguoi_tao_id'],[m
+[32m+[m[32m        ]);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Cap nhat su kien[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Cap nhat su kien[m
+[32m+[m[32m    public function capNhat(int $id, array $data): bool[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $sql = "[m
+[32m+[m[32m            UPDATE su_kien SET[m
+[32m+[m[32m                cau_lac_bo_id = :cau_lac_bo_id,[m
+[32m+[m[32m                ten_su_kien = :ten_su_kien,[m
+[32m+[m[32m                mo_ta = :mo_ta,[m
+[32m+[m[32m                dia_diem = :dia_diem,[m
+[32m+[m[32m                thoi_gian_bat_dau = :bat_dau,[m
+[32m+[m[32m                thoi_gian_ket_thuc = :ket_thuc,[m
+[32m+[m[32m                so_luong_toi_da = :so_luong,[m
+[32m+[m[32m                trang_thai = :trang_thai[m
+[32m+[m[32m            WHERE id = :id[m
+[32m+[m[32m        ";[m
+[32m+[m
+[32m+[m[32m        $stmt = $this->pdo->prepare($sql);[m
+[32m+[m
+[32m+[m[32m        return $stmt->execute([[m
+[32m+[m[32m            'id' => $id,[m
+[32m+[m[32m            'cau_lac_bo_id' => $data['cau_lac_bo_id'],[m
+[32m+[m[32m            'ten_su_kien' => $data['ten_su_kien'],[m
+[32m+[m[32m            'mo_ta' => $data['mo_ta'] ?: null,[m
+[32m+[m[32m            'dia_diem' => $data['dia_diem'] ?: null,[m
+[32m+[m[32m            'bat_dau' => $data['thoi_gian_bat_dau'],[m
+[32m+[m[32m            'ket_thuc' => $data['thoi_gian_ket_thuc'] ?: null,[m
+[32m+[m[32m            'so_luong' => $data['so_luong_toi_da'],[m
+[32m+[m[32m            'trang_thai' => $data['trang_thai'],[m
+[32m+[m[32m        ]);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m
+[32m+[m[32m    // Cap nhat trang thai: nhap, cong_khai, da_huy, ket_thuc[m
+[32m+[m[32m    public function capNhatTrangThai(int $id, string $trangThai): bool[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $cacTrangThai = ['nhap', 'cong_khai', 'da_huy', 'ket_thuc'];[m
+[32m+[m
+[32m+[m[32m        if (!in_array($trangThai, $cacTrangThai, true)) {[m
+[32m+[m[32m            return false;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        $stmt = $this->pdo->prepare([m
+[32m+[m[32m            "UPDATE su_kien SET trang_thai = :trang_thai[m
+[32m+[m[32m             WHERE id = :id"[m
+[32m+[m[32m        );[m
+[32m+[m
+[32m+[m[32m        return $stmt->execute([[m
+[32m+[m[32m            'id' => $id,[m
+[32m+[m[32m            'trang_thai' => $trangThai,[m
+[32m+[m[32m        ]);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Xoa su kien neu chua co dang ky lien quan[m
+[32m+[m[32m    public function xoa(int $id): bool[m
+[32m+[m[32m    {[m
+[32m+[m[32m        $stmt = $this->pdo->prepare([m
+[32m+[m[32m            "DELETE FROM su_kien WHERE id = :id"[m
+[32m+[m[32m        );[m
+[32m+[m
+[32m+[m[32m        return $stmt->execute(['id' => $id])[m
+[32m+[m[32m            && $stmt->rowCount() > 0;[m
+[32m+[m[32m    }[m
+[32m+[m[32m    public function coDangKy(int $id): bool[m
+[32m+[m[32m{[m
+[32m+[m[32m    $stmt = $this->pdo->prepare([m
+[32m+[m[32m        "SELECT COUNT(*) FROM dang_ky WHERE su_kien_id = :id"[m
+[32m+[m[32m    );[m
+[32m+[m
+[32m+[m[32m    $stmt->execute(['id' => $id]);[m
+[32m+[m
+[32m+[m[32m    return (int) $stmt->fetchColumn() > 0;[m
+[32m+[m[32m}[m
+[32m+[m[32m}[m
+[1mdiff --git a/app/Models/TaiKhoan.php b/app/Models/TaiKhoan.php[m
+[1mnew file mode 100644[m
+[1mindex 0000000..7d2e19e[m
+[1m--- /dev/null[m
+[1m+++ b/app/Models/TaiKhoan.php[m
+[36m@@ -0,0 +1,307 @@[m
+[32m+[m[32m<?php[m
+[32m+[m
+[32m+[m[32mrequire_once __DIR__ . '/../Core/ket_noi_csdl.php';[m
+[32m+[m
+[32m+[m[32mclass TaiKhoan[m
+[32m+[m[32m{[m
+[32m+[m[32m    private PDO $pdo;[m
+[32m+[m
+[32m+[m[32m    public function __construct()[m
+[32m+[m[32m    {[m
+[32m+[m[32m        global $pdo;[m
+[32m+[m[32m        $this->pdo = $pdo;[m
+[32m+[m[32m    }[m
+[32m+[m[32mpublic function danhSachBanToChuc([m
+[32m+[m[32m    string $tuKhoa = '',[m
+[32m+[m[32m    int $cauLacBoId = 0,[m
+[32m+[m[32m    int $limit = 10,[m
+[32m+[m[32m    int $offset = 0[m
+[32m+[m[32m): array {[m
+[32m+[m[32m    $where = ["nd.vai_tro = 'ban_to_chuc'"];[m
+[32m+[m[32m    $params = [];[m
+[32m+[m
+[32m+[m[32m    if ($tuKhoa !== '') {[m
+[32m+[m[32m        $where[] = '(nd.ho_ten LIKE :ten OR nd.email LIKE :email)';[m
+[32m+[m[32m        $params['ten'] = '%' . $tuKhoa . '%';[m
+[32m+[m[32m        $params['email'] = '%' . $tuKhoa . '%';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ($cauLacBoId > 0) {[m
+[32m+[m[32m        $where[] = 'clb.id = :clb_id';[m
+[32m+[m[32m        $params['clb_id'] = $cauLacBoId;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    $sql = "[m
+[32m+[m[32m        SELECT[m
+[32m+[m[32m            nd.id,[m
+[32m+[m[32m            nd.ho_ten,[m
+[32m+[m[32m            nd.email,[m
+[32m+[m[32m            nd.vai_tro,[m
+[32m+[m[32m            clb.id AS cau_lac_bo_id,[m
+[32m+[m[32m            clb.ten_cau_lac_bo[m
+[32m+[m[32m        FROM nguoi_dung nd[m
+[32m+[m[32m        LEFT JOIN cau_lac_bo clb[m
+[32m+[m[32m            ON clb.nguoi_quan_ly_id = nd.id[m
+[32m+[m[32m        WHERE " . implode(' AND ', $where) . "[m
+[32m+[m[32m        ORDER BY nd.id DESC[m
+[32m+[m[32m        LIMIT :limit OFFSET :offset[m
+[32m+[m[32m    ";[m
+[32m+[m
+[32m+[m[32m    $stmt = $this->pdo->prepare($sql);[m
+[32m+[m
+[32m+[m[32m    foreach ($params as $key => $value) {[m
+[32m+[m[32m        $stmt->bindValue([m
+[32m+[m[32m            ':' . $key,[m
+[32m+[m[32m            $value,[m
+[32m+[m[32m            is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR[m
+[32m+[m[32m        );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);[m
+[32m+[m[32m    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);[m
+[32m+[m[32m    $stmt->execute();[m
+[32m+[m
+[32m+[m[32m    return $stmt->fetchAll(PDO::FETCH_ASSOC);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mpublic function demTaiKhoanBanToChuc([m
+[32m+[m[32m    string $tuKhoa = '',[m
+[32m+[m[32m    int $cauLacBoId = 0[m
+[32m+[m[32m): int {[m
+[32m+[m[32m    $where = ["nd.vai_tro = 'ban_to_chuc'"];[m
+[32m+[m[32m    $params = [];[m
+[32m+[m
+[32m+[m[32m    if ($tuKhoa !== '') {[m
+[32m+[m[32m        $where[] = '(nd.ho_ten LIKE :ten OR nd.email LIKE :email)';[m
+[32m+[m[32m        $params['ten'] = '%' . $tuKhoa . '%';[m
+[32m+[m[32m        $params['email'] = '%' . $tuKhoa . '%';[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if ($cauLacBoId > 0) {[m
+[32m+[m[32m        $where[] = 'clb.id = :clb_id';[m
+[32m+[m[32m        $params['clb_id'] = $cauLacBoId;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    $sql = "[m
+[32m+[m[32m        SELECT COUNT(DISTINCT nd.id)[m
+[32m+[m[32m        FROM nguoi_dung nd[m
+[32m+[m[32m        LEFT JOIN cau_lac_bo clb[m
+[32m+[m[32m            ON clb.nguoi_quan_ly_id = nd.id[m
+[32m+[m[32m        WHERE " . implode(' AND ', $where);[m
+[32m+[m
+[32m+[m[32m    $stmt = $this->pdo->prepare($sql);[m
+[32m+[m[32m    $stmt->execute($params);[m
+[32m+[m
+[32m+[m[32m    return (int) $stmt->fetchColumn();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mpublic function tongTaiKhoanBanToChuc(): int[m
+[32m+[m[32m{[m
+[32m+[m[32m    return (int) $this->pdo->query([m
+[32m+[m[32m        "SELECT COUNT(*) FROM nguoi_dung[m
+[32m+[m[32m         WHERE vai_tro = 'ban_to_chuc'"[m
+[32m+[m[32m    )->fetchColumn();[m
+[32m+[m[32m}[m
+[32m+[m[32m    public function taoBanToChuc([m
+[32m+[m[32m        string $hoTen,[m
+[32m+[m[32m        string $email,[m
+[32m+[m[32m        string $matKhau,[m
+[32m+[m[32m        int $cauLacBoId[m
+[32m+[m[32m    ): bool {[m
+[32m+[m[32m        $kiemTraEmail = $this->pdo->prepare([m
+[32m+[m[32m            "SELECT id FROM nguoi_dung WHERE email = :email LIMIT 1"[m
+[32m+[m[32m        );[m
+[32m+[m[32m        $kiemTraEmail->execute(['email' => $email]);[m
+[32m+[m
+[32m+[m[32m        if ($kiemTraEmail->fetch()) {[m
+[32m+[m[32m            throw new RuntimeException('Email đã được sử dụng.');[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        $kiemTraClb = $this->pdo->prepare([m
+[32m+[m[32m            "SELECT id, nguoi_quan_ly_id[m
+[32m+[m[32m             FROM cau_lac_bo[m
+[32m+[m[32m             WHERE id = :id"[m
+[32m+[m[32m        );[m
+[32m+[m[32m        $kiemTraClb->execute(['id' => $cauLacBoId]);[m
+[32m+[m[32m        $clb = $kiemTraClb->fetch();[m
+[32m+[m
+[32m+[m[32m        if (!$clb) {[m
+[32m+[m[32m            throw new RuntimeException('Câu lạc bộ không tồn tại.');[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        if ($clb['nguoi_quan_ly_id'] !== null) {[m
+[32m+[m[32m            throw new RuntimeException([m
+[32m+[m[32m                'Câu lạc bộ này đã có tài khoản quản lý.'[m
+[32m+[m[32m            );[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        $hash = password_hash($matKhau, PASSWORD_DEFAULT);[m
+[32m+[m
+[32m+[m[32m        $this->pdo->beginTransaction();[m
+[32m+[m
+[32m+[m[32m        try {[m
+[32m+[m[32m            $sql = "[m
+[32m+[m[32m                INSERT INTO nguoi_dung[m
+[32m+[m[32m                    (ho_ten, email, mat_khau, vai_tro)[m
+[32m+[m[32m                VALUES[m
+[32m+[m[32m                    (:ho_ten, :email, :mat_khau, 'ban_to_chuc')[m
+[32m+[m[32m            ";[m
+[32m+[m
+[32m+[m[32m            $stmt = $this->pdo->prepare($sql);[m
+[32m+[m[32m            $stmt->execute([[m
+[32m
